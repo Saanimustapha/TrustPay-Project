@@ -40,8 +40,8 @@ class AuthService:
         self.db.add(user)
         await self.db.flush()          # get user.id without full commit
 
-        # Create default USD wallet immediately (atomically)
-        wallet = Wallet(user_id=user.id, currency="USD")
+        # Create default GHS wallet immediately (atomically)
+        wallet = Wallet(user_id=user.id, currency="GHS")
         self.db.add(wallet)
 
         await self.db.commit()
