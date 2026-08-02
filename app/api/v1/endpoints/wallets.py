@@ -1,4 +1,3 @@
-# app/api/v1/endpoints/wallets.py
 from decimal import Decimal
 from uuid import UUID
 
@@ -20,7 +19,7 @@ router = APIRouter(prefix="/wallets", tags=["wallets"])
 async def get_my_balance(
     current_user: CurrentUser,
     db: DBSession,
-    currency: str = "USD",
+    currency: str = "GHS",
 ):
     ledger = LedgerService(db)
     wallet = await ledger.get_wallet_for_user(current_user.id, currency)
