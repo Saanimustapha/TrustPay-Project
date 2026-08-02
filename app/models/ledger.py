@@ -1,4 +1,5 @@
-# app/models/ledger.py
+from __future__ import annotations
+
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -9,7 +10,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
-from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
