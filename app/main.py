@@ -2,7 +2,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
@@ -25,7 +24,6 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
     docs_url="/docs" if settings.ENVIRONMENT != "prod" else None,
     redoc_url=None,
-    default_response_class=ORJSONResponse,
     lifespan=lifespan,
 )
 
