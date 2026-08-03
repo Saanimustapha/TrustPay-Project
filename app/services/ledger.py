@@ -1,11 +1,10 @@
-# app/services/ledger.py
 from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.enums import LedgerEntryType
+from app.core.enums import LedgerEntryType, SystemAccountType
 from app.core.exceptions import (
     ConcurrentModificationError,
     InsufficientFundsError,
@@ -14,11 +13,13 @@ from app.core.exceptions import (
 )
 from app.models.ledger import LedgerEntry
 from app.models.wallet import Wallet
+from app.services.system_accounts import SystemAccountService
 
 
 class LedgerService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.system = SystemAccountService(db)
 
     async def get_wallet(self, wallet_id: UUID, *, for_update: bool = False) -> Wallet:
         stmt = select(Wallet).where(Wallet.id == wallet_id)
@@ -142,6 +143,7 @@ class LedgerService:
         currency: str = "GHS",
         idempotency_key: str | None = None,
         description: str | None = None,
+        fee_amount: Decimal = Decimal("0.0000"),
     ) -> UUID:
         """
         Credit a user wallet.
@@ -150,20 +152,96 @@ class LedgerService:
         """
         if amount <= 0:
             raise ValueError("Deposit amount must be positive")
+        if fee_amount < 0:
+            raise ValueError("Fee cannot be negative")
+
+        clearing_id = await self.system.get_system_wallet_id(
+            currency, SystemAccountType.CLEARING
+        )
+        fees_id = await self.system.get_system_wallet_id(
+            currency, SystemAccountType.FEES
+        )
+
+        net_amount = amount - fee_amount
+        if net_amount < 0:
+            raise ValueError("Fee cannot exceed deposit amount")
 
         entries = [
             {
                 "wallet_id": wallet_id,
-                "amount": amount,  # credit
+                "amount": net_amount,  # credit
                 "currency": currency,
                 "entry_type": LedgerEntryType.DEPOSIT,
                 "description": description or "Deposit",
-            }
-            # In production you would also debit a system float / external clearing account
+            },
+            {  # Clearing is debited (money entered the system)
+                "wallet_id": clearing_id,
+                "amount": -amount,
+                "currency": currency,
+                "entry_type": LedgerEntryType.DEPOSIT,
+                "description": "External deposit clearing",
+            },
         ]
-        # Temporary single-entry for Phase 2 simplicity – will be balanced later
-        # with a system wallet. For now we accept the imbalance at the system level.
+        if fee_amount > 0:
+            entries.append({
+                "wallet_id": fees_id,
+                "amount": fee_amount,
+                "currency": currency,
+                "entry_type": LedgerEntryType.FEE,
+                "description": "Deposit fee",
+            })
         return await self._apply_entries(entries, idempotency_key=idempotency_key)
+
+
+    async def withdraw(
+        self,
+        *,
+        wallet_id: UUID,
+        amount: Decimal,
+        currency: str,
+        idempotency_key: str | None = None,
+        description: str | None = None,
+        fee_amount: Decimal = Decimal("0.0000"),
+    ) -> UUID:
+        if amount <= 0:
+            raise ValueError("Withdrawal amount must be positive")
+
+        clearing_id = await self.system.get_system_wallet_id(
+            currency, SystemAccountType.CLEARING
+        )
+        fees_id = await self.system.get_system_wallet_id(
+            currency, SystemAccountType.FEES
+        )
+
+        total_debit = amount + fee_amount
+
+        entries = [
+            {  # User is debited full amount + fee
+                "wallet_id": wallet_id,
+                "amount": -total_debit,
+                "currency": currency,
+                "entry_type": LedgerEntryType.WITHDRAWAL,
+                "description": description or "Withdrawal",
+            },
+            {  # Clearing is credited (money leaves the system)
+                "wallet_id": clearing_id,
+                "amount": amount,
+                "currency": currency,
+                "entry_type": LedgerEntryType.WITHDRAWAL,
+                "description": "External withdrawal clearing",
+            },
+        ]
+        if fee_amount > 0:
+            entries.append({
+                "wallet_id": fees_id,
+                "amount": fee_amount,
+                "currency": currency,
+                "entry_type": LedgerEntryType.FEE,
+                "description": "Withdrawal fee",
+            })
+
+        return await self._apply_entries(entries, idempotency_key=idempotency_key)
+
 
     async def transfer(
         self,
@@ -174,16 +252,19 @@ class LedgerService:
         currency: str = "GHS",
         idempotency_key: str | None = None,
         description: str | None = None,
+        fee_amount: Decimal = Decimal("0.0000"),
     ) -> UUID:
         if amount <= 0:
             raise ValueError("Transfer amount must be positive")
         if from_wallet_id == to_wallet_id:
             raise ValueError("Cannot transfer to the same wallet")
 
+        fees_id = await self.system.get_system_wallet_id(currency, SystemAccountType.FEES)
+
         entries = [
             {
                 "wallet_id": from_wallet_id,
-                "amount": -amount,  # debit
+                "amount": -(amount + fee_amount),  # debit
                 "currency": currency,
                 "entry_type": LedgerEntryType.TRANSFER,
                 "description": description or "Transfer out",
@@ -196,6 +277,15 @@ class LedgerService:
                 "description": description or "Transfer in",
             },
         ]
+        if fee_amount > 0:
+            entries.append({
+                "wallet_id": fees_id,
+                "amount": fee_amount,
+                "currency": currency,
+                "entry_type": LedgerEntryType.FEE,
+                "description": "Transfer fee",
+            })
+            
         return await self._apply_entries(entries, idempotency_key=idempotency_key)
 
     async def get_balance(self, wallet_id: UUID) -> Decimal:
