@@ -34,6 +34,7 @@ class Wallet(Base):
         Numeric(precision=18, scale=4), default=Decimal("0.0000"), nullable=False
     )
     version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)  # optimistic locking
+    account_type: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
