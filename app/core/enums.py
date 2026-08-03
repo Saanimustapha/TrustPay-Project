@@ -15,6 +15,7 @@ class LedgerEntryType(StrEnum):
     FEE = "fee"
     REFUND = "refund"
     ADJUSTMENT = "adjustment"
+    SYSTEM = "system"
 
 
 class Currency(StrEnum):
@@ -22,3 +23,19 @@ class Currency(StrEnum):
     GHS = "GHS"
     EUR = "EUR"
     GBP = "GBP"
+
+
+class SystemAccountType(StrEnum):
+    CLEARING = "clearing"          # External money in/out
+    FEES = "fees"                  # Platform revenue
+    OPERATIONAL = "operational"    # Company float / operating capital
+
+
+class PaymentIntentStatus(StrEnum):
+    REQUIRES_PAYMENT_METHOD = "requires_payment_method"
+    REQUIRES_CONFIRMATION = "requires_confirmation"
+    PROCESSING = "processing"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELED = "canceled"
+    REQUIRES_ACTION = "requires_action"
