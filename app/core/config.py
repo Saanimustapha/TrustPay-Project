@@ -14,21 +14,21 @@ class Settings(BaseSettings):
     )
 
     # Application
-    APP_NAME: str = "PaymentPlatform"
+    APP_NAME: str 
     ENVIRONMENT: Literal["local", "dev", "staging", "prod"] = "local"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
     SECRET_KEY: SecretStr = Field(..., min_length=32)
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int 
+    REFRESH_TOKEN_EXPIRE_DAYS: int 
+    ALGORITHM: str 
 
     # Database
-    POSTGRES_USER: str = "payment"
+    POSTGRES_USER: str 
     POSTGRES_PASSWORD: SecretStr
-    POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5432
-    POSTGRES_DB: str = "payment_db"
+    POSTGRES_HOST: str 
+    POSTGRES_PORT: int 
+    POSTGRES_DB: str 
     DATABASE_URL: PostgresDsn | None = None
 
     # Redis
@@ -36,7 +36,10 @@ class Settings(BaseSettings):
 
     # Security / Rate limiting
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
-    RATE_LIMIT_PER_MINUTE: int = 60
+    RATE_LIMIT_PER_MINUTE: int 
+
+    #System User
+    SYSTEM_USER_EMAIL: str
 
     @property
     def async_database_url(self) -> str:
