@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.db.session import AsyncSessionLocal
+
+from app.services.system_accounts import SystemAccountService
 
 settings = get_settings()
 
@@ -14,6 +17,10 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     setup_logging(settings.ENVIRONMENT)
     # Future: init Redis, warm caches, etc.
+    # Ensure system accounts exist
+    async with AsyncSessionLocal() as session:
+        svc = SystemAccountService(session)
+        await svc.ensure_system_accounts()
     yield
     # Cleanup
 
