@@ -1,4 +1,6 @@
-# app/services/payment_intent.py
+import structlog
+logger = structlog.get_logger()
+
 import secrets
 from decimal import Decimal
 from uuid import UUID
@@ -93,7 +95,8 @@ class PaymentIntentService:
         error: str | None = None,
         reference_id: UUID | None = None,
     ) -> PaymentIntent:
-        self._assert_transition(pi.status, new_status)
+        old_status = pi.status
+        self._assert_transition(old_status, new_status)
 
         stmt = (
             update(PaymentIntent)
@@ -112,7 +115,27 @@ class PaymentIntentService:
         result = await self.db.execute(stmt)
         updated = result.scalar_one_or_none()
         if updated is None:
+            logger.error(
+            "payment_intent.transition.failed",
+            payment_intent_id=str(pi.id),
+            from_status=old_status,
+            attempted_status=new_status,
+            purpose=pi.purpose,
+            reason="concurrent_modification",
+            )
             raise ConcurrentModificationError()
+
+        logger.info(
+        "payment_intent.transition.completed",
+        payment_intent_id=str(pi.id),
+        user_id=str(pi.user_id),
+        from_status=old_status,
+        to_status=new_status,
+        purpose=pi.purpose,
+        amount=str(pi.amount),
+        currency=pi.currency,
+        reference_id=str(reference_id) if reference_id else None,
+        )
         return updated
 
     # ------------------------------------------------------------------
