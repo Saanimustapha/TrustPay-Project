@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger()
+
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -82,6 +85,11 @@ class LedgerService:
             )
             existing_ref = existing.scalar_one_or_none()
             if existing_ref is not None:
+                logger.info(
+                "ledger.idempotency.hit",
+                idempotency_key=idempotency_key,
+                reference_id=str(existing_ref),
+                )
                 return existing_ref  # already processed – safe to return
 
         # Create all ledger entries
@@ -113,6 +121,12 @@ class LedgerService:
 
             new_balance = current_balance + amount
             if new_balance < 0:
+                logger.warning(
+                "ledger.insufficient_funds",
+                wallet_id=str(wallet_id),
+                requested=str(amount),
+                available=str(current_balance),
+                )
                 raise InsufficientFundsError()
 
             # Optimistic update
@@ -126,6 +140,10 @@ class LedgerService:
             )
             result = await self.db.execute(stmt)
             if result.rowcount != 1:
+                logger.warning(
+                "ledger.concurrent_modification",
+                wallet_id=str(wallet_id),
+                )
                 raise ConcurrentModificationError()
 
         await self.db.flush()
@@ -190,7 +208,20 @@ class LedgerService:
                 "entry_type": LedgerEntryType.FEE,
                 "description": "Deposit fee",
             })
-        return await self._apply_entries(entries, idempotency_key=idempotency_key)
+        reference_id = await self._apply_entries(entries, idempotency_key=idempotency_key)
+
+        logger.info(
+        "ledger.transaction.completed",
+        operation="deposit",          
+        reference_id=str(reference_id),
+        wallet_id=str(wallet_id),
+        amount=str(amount),
+        fee_amount=str(fee_amount),
+        currency=currency,
+        idempotency_key=idempotency_key,
+        )
+
+        return reference_id
 
 
     async def withdraw(
@@ -240,7 +271,20 @@ class LedgerService:
                 "description": "Withdrawal fee",
             })
 
-        return await self._apply_entries(entries, idempotency_key=idempotency_key)
+        reference_id = await self._apply_entries(entries, idempotency_key=idempotency_key)
+
+        logger.info(
+        "ledger.transaction.completed",
+        operation="withdraw",          
+        reference_id=str(reference_id),
+        wallet_id=str(wallet_id),
+        amount=str(amount),
+        fee_amount=str(fee_amount),
+        currency=currency,
+        idempotency_key=idempotency_key,
+        )
+
+        return reference_id
 
 
     async def transfer(
@@ -286,7 +330,23 @@ class LedgerService:
                 "description": "Transfer fee",
             })
             
-        return await self._apply_entries(entries, idempotency_key=idempotency_key)
+        reference_id = await self._apply_entries(entries, idempotency_key=idempotency_key)
+
+        logger.info(
+        "ledger.transaction.completed",
+        operation="transfer",
+        reference_id=str(reference_id),
+        from_wallet_id=str(from_wallet_id),
+        to_wallet_id=str(to_wallet_id),
+        amount=str(amount),
+        fee_amount=str(fee_amount),
+        currency=currency,
+        idempotency_key=idempotency_key,
+        )
+
+        return reference_id
+
+        
 
     async def get_balance(self, wallet_id: UUID) -> Decimal:
         wallet = await self.get_wallet(wallet_id)
