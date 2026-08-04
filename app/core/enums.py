@@ -39,3 +39,10 @@ class PaymentIntentStatus(StrEnum):
     FAILED = "failed"
     CANCELED = "canceled"
     REQUIRES_ACTION = "requires_action"
+
+
+class PaymentIntentPurpose(StrEnum):
+    DEPOSIT = "deposit"          # User funding their own wallet
+    PAYMENT = "payment"          # Paying a merchant / another user
+    TRANSFER = "transfer"        # Internal P2P (can also use direct transfer API)
+    REFUND = "refund"            # Skeleton for later
