@@ -43,6 +43,6 @@ class PaymentIntentStatus(StrEnum):
 
 class PaymentIntentPurpose(StrEnum):
     DEPOSIT = "deposit"          # User funding their own wallet
-    PAYMENT = "payment"          # Paying a merchant / another user
+    WITHDRAWAL = "withdrawal"        # Withdrawing money from own wallet
     TRANSFER = "transfer"        # Internal P2P (can also use direct transfer API)
     REFUND = "refund"            # Skeleton for later
