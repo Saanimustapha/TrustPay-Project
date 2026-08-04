@@ -30,3 +30,8 @@ class IdempotencyConflictError(HTTPException):
 class UnbalancedTransactionError(Exception):
     """Internal – should never reach the client."""
     pass
+
+
+class InvalidStateTransitionError(Exception):
+    def __init__(self, current: str, target: str):
+        super().__init__(f"Cannot transition from '{current}' to '{target}'")
