@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
-from app.core.enums import PaymentIntentStatus
+from app.core.enums import PaymentIntentStatus, PaymentIntentPurpose
 
 
 class PaymentIntent(Base):
@@ -22,11 +22,18 @@ class PaymentIntent(Base):
     )
     amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(32), default=PaymentIntentStatus.REQUIRES_CONFIRMATION, index=True
+    fee_amount: Mapped[Decimal] = mapped_column(
+        Numeric(18, 4), default=Decimal("0.0000"), nullable=False
     )
-    client_secret: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(
+        String(32), default=PaymentIntentStatus.REQUIRES_CONFIRMATION, index=True, nullable=False
+    )
+    client_secret: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(String(128), unique=True, index=True)
+    destination_wallet_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), index=True, nullable=True
+    )
     description: Mapped[str | None] = mapped_column(Text)
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB)
     last_payment_error: Mapped[str | None] = mapped_column(Text)
