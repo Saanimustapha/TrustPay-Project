@@ -1,3 +1,6 @@
+import structlog
+logger = structlog.get_logger()
+
 from uuid import UUID
 
 from sqlalchemy import select
@@ -40,6 +43,8 @@ class AuthService:
         self.db.add(user)
         await self.db.flush()          # get user.id without full commit
 
+        logger.info("auth.user.registered", user_id=str(user.id), email=user.email)
+
         # Create default GHS wallet immediately (atomically)
         wallet = Wallet(user_id=user.id, currency="GHS")
         self.db.add(wallet)
@@ -49,11 +54,34 @@ class AuthService:
         return user
 
     async def authenticate(self, email: str, password: str) -> User | None:
-        user = await self.get_user_by_email(email.lower().strip())
+        normalized_email = email.lower().strip()
+        user = await self.get_user_by_email(normalized_email)
+
+        # Failed: user does not exist or password is wrong
         if not user or not verify_password(password, user.hashed_password):
+            logger.warning(
+                "auth.login.failed",
+                email=normalized_email,
+                reason="invalid_credentials",
+            )
             return None
+
+        # Failed: account is disabled
         if not user.is_active:
+            logger.warning(
+                "auth.login.failed",
+                email=normalized_email,
+                user_id=str(user.id),
+                reason="user_inactive",
+            )
             return None
+
+        # Success
+        logger.info(
+            "auth.login.success",
+            user_id=str(user.id),
+            email=normalized_email,
+        )
         return user
 
     def create_tokens(self, user_id: UUID) -> dict[str, str]:
