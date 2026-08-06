@@ -112,15 +112,18 @@ class LedgerService:
 
             # Read current version
             result = await self.db.execute(
-                select(Wallet.version, Wallet.cached_balance).where(Wallet.id == wallet_id)
+                select(Wallet.version, 
+                       Wallet.cached_balance,
+                       Wallet.account_type,
+                       ).where(Wallet.id == wallet_id)
             )
             row = result.one_or_none()
             if row is None:
                 raise WalletNotFoundError()
-            current_version, current_balance = row
+            current_version, current_balance, account_type = row
 
             new_balance = current_balance + amount
-            if new_balance < 0:
+            if account_type is None and new_balance < 0:
                 logger.warning(
                 "ledger.insufficient_funds",
                 wallet_id=str(wallet_id),
